@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<!--html manifest="application.appcache"-->
+<html>
+
+<meta charset="UTF-8">
+<link rel="stylesheet" href="js/font-awesome-4.7.0/css/font-awesome.min.css">
+<link rel="stylesheet" href="js/leaflet-1.3.1-fork-va2ron1-20180406/leaflet.css"/> 
+<link rel="stylesheet" href="js/Leaflet.EasyButton-1.1.1/src/easy-button.css">
+<link rel="stylesheet" href="js/Leaflet.draw-0.4.14/dist/leaflet.draw.css">
+<link rel="stylesheet" href="js/leaflet.photon-0.7.3/leaflet.photon.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.rawgit.com/gokertanrisever/leaflet-ruler/master/src/leaflet-ruler.css">
+
+
+
+<style>
+body		{overflow-x:hidden;overflow-y:hidden;font-family:Lucida Sans, "Arial", Helvetica, sans-serif; background:rgb(16,46,66); color:white; padding:0% 2.5%}
+
+.divicon
+{
+	background: 	rgba(255,255,255,.75);
+	height: 	2em !important;
+	width: 		2em !important;
+	color: 		black;
+	text-align: 	center;
+	padding-top: 	.5em;
+	font-weight: 	bold;
+	border: 	2px solid black;
+	border-radius: 	10px;
+}
+.coord
+{
+	text-align:center;
+	height:15%;
+	padding: 1em;
+}
+.coord_caption
+{
+	height:10%;
+	padding-top:    .25em;
+	padding-bottom: .25em;
+	text-align: left;
+	font-weight: bold;
+}
+.emptyicon
+{
+	background:transparent;
+	border:none;
+	color:black
+}
+.boldicon
+{
+	background:transparent;
+	border:none;
+	color:black;
+	font-weight:bold
+}
+.mapicons
+{
+
+    margin: 10px 10px;
+    border-radius: 5px;
+    padding: 10px;
+    height: 15px;
+    width: 16%;
+    display: inline-block;
+    text-align: center;
+    font-size: 15px;
+
+}
+.mi_red
+{
+	background: rgba(255,0,0,.85);
+}
+.mi_green
+{
+	background: rgba(125,166,125,.85);
+}
+.mi_red:hover
+{
+	background: red;
+}
+.mi_green:hover
+{
+	background:  rgba(0,221,0,.85);
+}
+#qrcode-close:hover
+{
+	color:blue;
+	font-weight:bold
+}
+
+
+ul.photon-autocomplete
+{
+	color:black;
+	background:rgba(255,255,255,.5);
+}
+.photon-input
+{	
+	width:75px
+}
+.easyPrintHolder .a3CssClass 
+{ 
+  	background-image: url(data:image/svg+xml;utf8;base64,PD9...go=);
+}
+</style>
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height, target-densitydpi=device-dpi" />
+    </head>
+    <body>
+	<div class="togglemap fa fa-globe fa-2x"     style="position:fixed; top:5px; right:5px"></div>
+	
+	<div id="app2" class="app" style="display:none">
+		<div id="maptools">
+			<center>
+			<span id='btn-grid'   title="créer une grille" class="mapicons mi_red">Grille: créer</span>
+			<span id='btn-line'   title="créer un parcours" class="mapicons mi_red">Parcours: créer</span>
+			<span id='btn-upload' title="utiliser un parcours en KML ou GPX" class="mapicons mi_red">Parcours: <i class="fa fa-upload"></i> KML/GPX</span>
+			<div class="lbr" style='display:none'></div>
+			<input id="file-input" accept='.gpx,.kml,.geojson' type="file" hidden/>
+			<span id='btn-link'   title="générer un lien"  class="mapicons mi_green">Partager</span><span id='btn-kml'   title="télécharger au format KML" class="mapicons mi_green">Télécharger</span>
+			</center>
+		</div>
+		<div id="map2"></div>
+	</div>
+        <div id="app" class="app" style="display:none">
+			<center><h1>Poppy Quickgrid</h1></center>
+
+			<div id="mysquare"     class="coord" style="font-family:Lucida Sans;font-size:300%; font-weight:bold;height:2em"></div>
+			<div class="coord_caption">We found you with an accuracy of</div>
+			<div id="myaccuracy"      class="coord" style="height:1em">[ trying to retrieve your location ]</div>
+				
+			<div class="coord_caption">XY</div>
+			<div id="mylambert72"  class="coord" style="height:1em">[ trying to retrieve your location ]</div>
+				
+			<div class="coord_caption">WGS 84</div>
+			<div id="mywgs84"      class="coord" style="height:1em;">[ trying to retrieve your location ]</div><br><br>&nbsp;
+			
+			<div id="mylastupdate" style="position:fixed; z-index: 1; bottom:1%; background:rgb(16,46,66); "><span id="myupdateicon"></span>&nbsp;<span id="myupdatetext"></span></div>
+        </div>
+
+	<div id="qrcode-wrap" style="position: absolute;top: 0px;left: 0px;height:325px;max-height:100%;width:275px;max-width:100%;z-index: 9999999; border-radius:10px;background:white;color:black;padding:25px; text-align:center; display:none">
+		<div                     style='margin-bottom:.5em'>Utilisez ce lien sur smartphone pour connaître votre position</div>
+		<input id="qrcode-text"  style="font-family:inherit;padding:5px">
+		<div   id="qrcode"       style="background:white;margin:20px 50px" >
+		</div>
+		<div   id="qrcode-close" style="padding-top:.5em">OK</div>
+	</div>
+
+	<script src="js/leaflet-1.3.1-fork-va2ron1-20180406/leaflet.js?a=1"></script> 
+	<script type="text/javascript" src="js/hammer-2.0.8.js"></script>
+	<script src="js/Proj4Leaflet-0.7.0/lib/proj4-compressed.js"></script>
+	<script src="js/Proj4Leaflet-0.7.0/src/proj4leaflet.js"></script>
+	<script type="text/javascript" src="js/jquery-2.1.1.min.js"></script>
+	<script type="text/javascript" src="js/Leaflet.EasyButton-1.1.1/src/easy-button.js"></script>
+	<script type="text/javascript" src="js/Leaflet.draw-0.4.14/dist/leaflet.draw.js"></script>
+	<script type="text/javascript" src="js/leaflet.photon-0.7.3/leaflet.photon.js"></script>
+	<script type="text/javascript" src="js/leaflet-omnivore-0.3.3/leaflet-omnivore.min.js"></script>
+	<script type="text/javascript" src="js/davidshimjs-qrcodejs-04f46c6/qrcode.min.js"></script>
+	<script type="text/javascript" src="js/leaflet-easyPrint-v1-2018-06-18/dist/bundle.js"></script>
+	<script type="text/javascript" src="js/index.js?a=43"></script>
+	<script type="text/javascript" src="js/tokml.js"></script>
+	<script type="text/javascript" src="js/download2.js"></script>
+	
+
+    </body>
+</html>
+
+
+

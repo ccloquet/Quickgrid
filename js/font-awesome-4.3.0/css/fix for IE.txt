@@ -1,0 +1,5 @@
+../fonts/fontawesome-webfont.eot?#iefix&v=4.0.1
+
+should be:
+
+../fonts/fontawesome-webfont.eot?v=4.0.1#iefix
