@@ -23,12 +23,9 @@ var sep_url   = '?'
 var myPhotonMarker = null
 var WIDTH_LIMIT = 1036
 
-var tms  = [ 	
-		{ url:'', 	attr: 'Skobbler', subd:['1', '2', '3'], maxzoom:18 },
-		{ url:'', 							attr: 'Mapbox',   subd:['a', 'b', 'c'], maxzoom:20 },
-		{ url:'', 							attr: 'Mapbox',   subd:['a', 'b', 'c'], maxzoom:20 }
-	   ]
-
+var tms  = [
+               
+           ]
 
 var TL        = null
 var epsg_31370_str = '+lat_0=90 +lat_1=51.16666723333333 +lat_2=49.8333339 '
@@ -212,8 +209,8 @@ function init()
 
 		$('#btn-line').on('click', create_line )
 		$('#btn-grid').on('click', create_grid )
-		$('#btn-link').on('click', function(){ 
-
+		$('#btn-link').on('click', function()
+		{ 
 			if (myurl == "") return
 
 			$('#qrcode-wrap').css('top', $(window).height()/2-325/2).css('left', $(window).width()/2-275/2)
@@ -420,7 +417,7 @@ function init_map()
 	  
 		switch(TYPEREF)
 		{
-			/*case 'grid':	g   = getSquarePoint(mycrs, my_coords, x0y0, delta, delta, xlabels, ylabels)
+			/*case 'grid':	g   = getSquarePoint(mycrs, my_coords, delta, bea, xlabels, ylabels)
 					idx = g.mysquare
 					break;*/
 			case 'line':	if (the_line != null)
@@ -485,7 +482,12 @@ function set_new_editable_layer(layer, type)
 
 			var LL_P_1 = 0, LL_P_3 = 0, j = -1, k = 1
 
-			while ( ! ((LL_P_1.x > 0) & (LL_P_3.y < 0)) )	// find the right orientation (otherwise, if start drawing from lower right -> does not display the grid correctly)
+			var b = mymap.getBearing()
+
+			var s = 1
+			if ( ((b > 90) & (b < 270)) | (b < -90) & (b > -270) ) s = -1
+
+			while ( ! ((s*LL_P_1.x > 0) & (s*LL_P_3.y < 0)) )	// find the right orientation (otherwise, if start drawing from lower right -> does not display the grid correctly)
 			{
 				// iterate clockwise & counter clockwise
 				if (j == 4) {j = 0; k = -1}
@@ -495,7 +497,6 @@ function set_new_editable_layer(layer, type)
 
 				LL_P_1 = mycrs.projection.project(LL[mod(j+k*1,4)])
 				LL_P_3 = mycrs.projection.project(LL[mod(j+k*3,4)])
-
 			}
 
 			var dx       = Math.ceil(Math.sqrt(LL_P_1.x*LL_P_1.x + LL_P_1.y*LL_P_1.y))		// size in x
@@ -563,7 +564,6 @@ function TLayer_set()
 }
 function show_grid(latlng_31370, xlabels, ylabels, delta, Nx, Ny, b)
 {
- 
 	// lowlevel grid
 	var 	G = [], H = [],
 		cb = Math.cos(b*Math.PI/180), 
@@ -665,7 +665,7 @@ function get_position()
 
 			switch(TYPEREF)
 			{
-				case 'grid':	g = getSquarePoint(mycrs, my_coords, x0y0, delta, delta, xlabels, ylabels)
+				case 'grid':	g = getSquarePoint(mycrs, my_coords, delta, bea, xlabels, ylabels)
 						$('#mysquare').html(g.mysquare)
 						$('#mylambert72').html(g.mylambert72)
 						break;
@@ -703,18 +703,24 @@ function get_position()
 	)
 }
 
-function getSquarePoint(thecrs, mycoordinates, x0y0, dx, dy, caption_x, caption_y)
+function getSquarePoint(thecrs, mycoordinates, delta, bea, caption_x, caption_y)
 {
 	// get the grid square where the user is
-
-	// x0, y0, dx, dy are in metric CRS
+	// delta in meters
 	// mycoordinates are in EPSG 4326
 
-	var 	latlng_31370 	= thecrs.projection.project(mycoordinates),
-		eta_y 		= -(latlng_31370.y - x0y0[1]) / dy, eta_x = (latlng_31370.x - x0y0[0]) / dx,
+	var 	cb 		= Math.cos(bea * Math.PI/180), 
+		sb 		= Math.sin(bea * Math.PI/180)
+ 
+ 	var 	XY 		= thecrs.projection.project(mycoordinates),
+		XY_rotated      = {x:   cb * XY.x + sb * XY.y , y:  -sb * XY.x + cb * XY.y},
+		eta_y 		= -(XY_rotated.y ) / delta, 
+		eta_x 		=  (XY_rotated.x ) / delta,
 	  	iy 		= Math.floor ( eta_y ), hy = eta_y - iy,
 		ix 		= Math.floor ( eta_x ), hx = eta_x - ix,
 		mysquare, complem
+
+	console.log(mycoordinates, delta, bea, XY, XY_rotated)
 
 	if 	((hx < .5)  & (hy < .5) ) complem = 'a'
 	else if ((hx >= .5) & (hy < .5) ) complem = 'b'
@@ -727,7 +733,7 @@ function getSquarePoint(thecrs, mycoordinates, x0y0, dx, dy, caption_x, caption_
 	var ret =  
 	{	
 		mysquare: 	mysquare,
-		mylambert72:	'x = ' + Math.abs(Math.round(latlng_31370.x)) + ', y = ' + Math.abs(Math.round(latlng_31370.y))
+		mylambert72:	'x = ' + Math.abs(Math.round(XY.x)) + ', y = ' + Math.abs(Math.round(XY.y))
 	}
 
 	return ret;
