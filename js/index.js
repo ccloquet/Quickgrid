@@ -1,7 +1,9 @@
 $(window).load(onDeviceReady)
 
-var url_base  = 'https://grid.my-poppy.eu/' 		// trailing / is important so that some QR code readers are able to read the url
-var url_stats = 'https://grid.my-poppy.eu/stats.php'
+var debug 	= true
+var url_base      = 'https://grid.my-poppy.eu/' 		// trailing / is important so that some QR code readers are able to read the url
+var url_stats     = 'https://grid.my-poppy.eu/stats.php'
+var url_nominatim = "https://nominatim.openstreetmap.org/reverse?format=json"
 var x0y0      = [152200, 153000]; // in EPSG31370
 var delta     = 100; // in meters
 var bea       = 0;   // in degrees
@@ -15,16 +17,24 @@ var LH        = null
 var CM	      = null
 var mymap     = null
 var map_state = 0
+var map_first_view = true
 var current_url = 0
 var myurl     = ''
 var qrcode    = null
 var the_line  = null
 var sep_url   = '?'
+
 var myPhotonMarker = null
-var WIDTH_LIMIT = 1036
+var WIDTH_LIMIT    = 1049
+
+var address_coords = null
+var current_coords = null
+var address_set    = false
 
 var tms  = [
-               
+                { url:'',   attr: 'Skobbler', subd:['1', '2', '3'], maxzoom:18 },
+                { url:'',                                                      attr: 'Mapbox',   subd:['a', 'b', 'c'], maxzoom:20 },
+                { url:'',                                                      attr: 'Mapbox',   subd:['a', 'b', 'c'], maxzoom:20 }
            ]
 
 var TL        = null
@@ -76,42 +86,44 @@ function onDeviceReady()
 	// add the recognizers
 	manager.add(Pan);
 	manager.add(Rotate);
- 
+
 	// subscribe to events
 	var currentRotation = 0, lastRotation, startRotation;
-	manager.on('rotatemove', function(e) {
-	    // do something cool
-	    var diff = startRotation - Math.round(e.rotation);
-	  currentRotation = lastRotation - diff;
-	    //$.Velocity.hook($stage, 'rotateZ', currentRotation + 'deg');
-	mymap.setBearing(currentRotation)
+	manager.on('rotatemove', function(e) 
+	{
+	    	var diff = startRotation - Math.round(e.rotation);
+	  	currentRotation = lastRotation - diff;
+	 	mymap.setBearing(currentRotation)
 	});
 
-	manager.on('rotatestart', function(e) {
-	  lastRotation = currentRotation;
-	  startRotation = Math.round(e.rotation);
+	manager.on('rotatestart', function(e) 
+	{
+	  	lastRotation = currentRotation;
+	  	startRotation = Math.round(e.rotation);
 	});
 
-	manager.on('rotateend', function(e) {
-	    // cache the rotation
-	    lastRotation = currentRotation;
+	manager.on('rotateend', function(e) 
+	{
+	    	// cache the rotation
+	    	lastRotation = currentRotation;
 	});
 
 	if ($(window).width() < WIDTH_LIMIT)
 	{
-		$('#btn-grid').html('<i class="fa fa-pencil"></i> Grille')
-		$('#btn-link').html('<i class="fa fa-share-alt"></i>')
+		$('#btn-grid').html('① <i class="fa fa-pencil"></i> '	+ msg.grid_short)
+		$('#btn-link').html('② <i class="fa fa-share-alt"></i> '+ msg.generate_short)
 		$('#btn-line').hide()
 		$('.lbr').show()
-		$('#btn-upload').html('<i class="fa fa-upload"></i> Parcours')
-		$('#btn-kml').html('<i class="fa fa-download"></i> KML')
+		$('#btn-upload').html('① <i class="fa fa-upload"></i> '	+ msg.parcours_short)
+		$('#btn-kml').html('③ <i class="fa fa-download"></i> '	+ msg.KML_short)
 		$('.mapicons').css('width', '30%')
+		$('.my_or').hide()
 	}
 }
 
 function init()
 {
-	  if (window.location.href.indexOf('my-poppy') > -1) 	// condition to avoid sending stats for tests
+	  if (!debug) if (window.location.href.indexOf('my-poppy') > -1) 	// condition to avoid sending stats for tests
 	  { 
 		$.get(url_stats)				// send stats to server -> only the timestamp is recorded, no ip
 	  }
@@ -123,6 +135,8 @@ function init()
 		$('#maptools').hide()
 
 		init_map()
+
+		$('#myaddress').click(function(){get_address(current_coords)})
 
 		var s = window.location.href.split(sep_url)
 		s = s[1]
@@ -184,7 +198,8 @@ function init()
 		}
 
 		$("#myupdateicon").html('<i class="fa fa-spinner fa-spin"></i>')
-		$("#myupdatetext").html('Acquiring position')
+		$("#myupdatetext").html(msg.acquiring)
+		$('.tofilter').addClass('filter')
 
 		if (WP == null) get_position()
 
@@ -206,17 +221,20 @@ function init()
 		init_map()
 
 		$('.btn-back').parent().parent().hide()
-
 		$('#btn-line').on('click', create_line )
 		$('#btn-grid').on('click', create_grid )
 		$('#btn-link').on('click', function()
 		{ 
-			if (myurl == "") return
+			if (myurl == "") 
+			{
+				window.alert(msg.link_explain);
+				return
+			}
 
 			$('#qrcode-wrap').css('top', $(window).height()/2-325/2).css('left', $(window).width()/2-275/2)
 
 			$("#qrcode-wrap").fadeIn()
-			$('#qrcode-text').val(myurl) 		
+			$('#qrcode-text').text(myurl) 		
 
 			if (qrcode != null) 
 			{
@@ -242,10 +260,10 @@ function init()
 			var json = LH.toGeoJSON(); 
 			console.log(json); 
 
-			var kml  = tokml(json); download(kml, 'grid_' + Date.now() + '.kml', "text/plain");
+			var kml  = tokml(json); download(kml, 'poppy_quickgrid_' + Date.now() + '.kml', "text/plain");
 		})
 
-		window.alert('Quickgrid : se repérer par rapport à un quadrillage ou à un parcours. Pour un résultat optimal, dessinez la grille ou le parcours sur ordinateur, puis chargez le lien sur mobile.\n\nVIE PRIVÉE: Votre localisation est utilisée pour centrer la carte, elle n\'est pas transmise au serveur. Si vous utilisez un service externe de localisation (ex : Google), votre position peut lui être transmise. Les parcours que vous tracez sont stockées sur jsonblob.com et accessible à tout qui connaît le lien public. Nous enregistrons la date et l\'heure de votre passage, le pays de votre adresse IP (sans transmission à un serveur tiers) ainsi qu\'une empreinte (fonction sha1) de votre adresse IP, afin de gérer au mieux ce service. Plus d\'infos : https://docs.my-poppy.eu/privacy.html.\n\nFourni sans aucune garantie. Référez-vous au code source sur GitHub (ccloquet/quickgrid)')
+		window.alert(msg.quickgrid_explain)
 	}
 
 	if ($(window).width() < WIDTH_LIMIT) $('.leaflet-control-easyPrint').hide()
@@ -263,23 +281,24 @@ function create_line(e)
 {
 	if (mobileAndTabletcheck() )
 	{
-		window.alert('Vous avez besoin d\'un ordinateur avec souris pour utiliser cette fonction')
+		window.alert(msg.computer_needed)
 	}
 	else
 	{
-		window.alert('Cliquez sur les points du parcours'); 
+		window.alert(msg.line_explain); 
 		new L.Draw.Polyline(mymap, {shapeOptions:  {color: '#f357a1',weight: 5}}).enable() 			
 	}
 }
+
 
 function create_grid(e)
 {
 	if (mobileAndTabletcheck() )
 	{
-		window.alert('Double-cliquez sur le coin supérieur droit de la grille')
+		window.alert(msg.grid_explain)
 		mymap.on('dblclick', function(e)
 		{
-			delta          	= window.prompt('Taille d\'un carré (mètres)')
+			delta          	= window.prompt(msg.square_size)
 			mycrs 	     	= new L.Proj.CRS("EPSG:999999","+proj=tmerc +lat_0="+e.latlng.lat+" +lon_0="+e.latlng.lng+" +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
 			var X0Y0     	= mycrs.projection.project(e.latlng)
 		 
@@ -292,7 +311,7 @@ function create_grid(e)
 	}
 	else
 	{
-		window.alert('Dessinez la zone couverte par la grille'); 
+		window.alert(msg.grid_explain_draw); 
 		if (LG != null)
 		{
 			mymap.removeLayer(LG)
@@ -305,27 +324,27 @@ function create_grid(e)
 	
 function toggle_map()
 {
+	$('.togglemap').toggle()
+	$('#app').toggle()
+	$('#app2').toggle()
+
 	if (map_state == 0)
 	{
-		show_map()
+		mymap.invalidateSize()
 		get_position()
-		if (LG != null) mymap.fitBounds(LG.getBounds())
-		else if (lineLayers != null)   mymap.fitBounds(lineLayers.getBounds())
+		if (LG != null) 		mymap.fitBounds(LG.getBounds())
+		else if (lineLayers != null)   	mymap.fitBounds(lineLayers.getBounds())
+		if (map_first_view)
+		{
+			currentRotation = lastRotation = bea
+			mymap.setBearing(currentRotation)
+			map_first_view = false
+		}
 	}
-	else
-	{
-		$('#app2').hide()
-		$('#app').show()
-	}
+
 	map_state = 1-map_state
 }
 
-function show_map()
-{
-	$('#app').hide()
-	$('#app2').show()
-	mymap.invalidateSize()
-}
 function myPhotonHandler(e)
 {
 	var LL = [e.geometry.coordinates[1], e.geometry.coordinates[0]]
@@ -334,19 +353,20 @@ function myPhotonHandler(e)
 	myPhotonMarker.addTo(mymap)
 	mymap.setView(LL, 13);
 }
+
 function init_map()
 {
 	$('#map2').height($(window).height() - $("#app2").height())
 
 	mymap = L.map('map2', 
 	{
-		zoomDelta:.25, 
-		zoomSnap:.25, 
-		rotate:true, 
-		photonControl: true,
+		zoomDelta:	.25, 
+		zoomSnap:	.25, 
+		rotate:		true, 
+		photonControl: 	true,
 		photonControlOptions: 
 		{
-			placeholder: 'Adresse',
+			placeholder: msg.adress,
 			position: 'topleft',
 			onSelected: myPhotonHandler,
 		}
@@ -372,17 +392,17 @@ function init_map()
 		
 	}, 'change basemap', 'topright').addTo( mymap );  
 
-	L.easyButton('fa-copyright', function(btn, map)
+	L.easyButton('fa-info-circle', function(btn, map)
 	{
-		window.alert(	"Développé par Poppy, 2018\n" 
+		window.alert(	"Veveloped by Poppy, 2018\n" 
 				+"contact: christophe@my-poppy.eu\n"
-				+"web: www.my-poppy.eu\n\n"
-				+"Crédits:\n"
+				+"web: www.my-poppy.eu & blog.my-poppy.eu\n"
+				+"github: github.com/ccloquet/quickgrid\n"
+				+"\nCrédits:\n"
 				+"font-awesome-4.7.0 [github.com/FortAwesome/Font-Awesome/blob/master/LICENSE.txt]\n"
 				+"leaflet-1.3.1 fork by va2ron1 [github.com/va2ron1/Leaflet/blob/master/LICENSE]\n"
 				+"Leaflet.EasyButton-1.1.1 [github.com/CliffCloud/Leaflet.EasyButton/blob/master/LICENSE]\n"
 				+"Leaflet.Omnivore-0.3.3 [https://github.com/mapbox/leaflet-omnivore/blob/master/LICENSE]\n"
-				+"leaflet-ruler [github.com/gokertanrisever/leaflet-ruler/blob/master/LICENSE.md]\n"
 				+"hammer-2.0.8.js [github.com/hammerjs/hammer.js/blob/master/LICENSE.md]\n"
 				+"Proj4Leaflet [github.com/kartena/Proj4Leaflet/blob/master/LICENSE]\n"
 				+"jquery-2.1.1 [github.com/jquery/jquery/blob/master/LICENSE.txt]\n"
@@ -431,7 +451,6 @@ function init_map()
 						.openOn(mymap);
 					break;
 		}
-		
 	})
 
 	editableLayers.on('mouseout',       function(e) 
@@ -510,13 +529,13 @@ function set_new_editable_layer(layer, type)
 			{
 				if ( (delta_list[i] >= dx/xlabels.length) & (delta_list[i] < dx/4)) my_delta.push({delta:delta_list[i], Nx:Math.ceil(dx/delta_list[i]), Ny:Math.ceil(dy/delta_list[i])})
 			}
-		 
-			var txt = 'Choisissez le carroyage qui vous convient:\n\n'
+
+			var txt = msg.grid_choose+'\n\n'
 			for (var i=0; i<my_delta.length; ++i)
 			{
 				txt += '[' + String.fromCharCode(65+i) + '] ' + my_delta[i].Nx + ' x ' + my_delta[i].Ny + ' (' + my_delta[i].delta + ' m)\n'
 			}
-			txt += 'ou entrez une taille de carré personnalisée (entre '+Math.ceil(dx/xlabels.length)+' et '+Math.floor(dx/4)+' m) :'
+			txt += msg.perso_size_between+Math.ceil(dx/xlabels.length)+' '+msg.and+' '+Math.floor(dx/4)+' m) :'
 
 			var delta = null, Nx, Ny
 			var ret = window.prompt(txt)
@@ -588,12 +607,13 @@ function show_grid(latlng_31370, xlabels, ylabels, delta, Nx, Ny, b)
 
 			if ( ( (i%2==0) & (j%2==0) ) ) 
 			{
-				myname     = xlabels[i].toUpperCase()+ylabels[j]
-				var myIcon = L.divIcon({className:'emptyicon', html: myname});
-				var marker = L.marker(LL, {icon: myIcon})
-				marker.properties = {};
-				marker.properties.Name = "Test"
+				myname     		= xlabels[i].toUpperCase()+ylabels[j]
+				var myIcon 		= L.divIcon({className:'emptyicon', html: myname});
+				var marker 		= L.marker(LL, {icon: myIcon})
+				marker.properties 	= {};
+				marker.properties.Name 	= "Test"
 				G.push(marker)
+				H.push(L.marker(LL, {icon: myIcon, name: myname }));			// to display the names
 			}
 			
 			if ( (i == 0) | (j == 0 ) )
@@ -624,7 +644,7 @@ function show_grid(latlng_31370, xlabels, ylabels, delta, Nx, Ny, b)
 	var LL_BR  = mycrs.projection.unproject({x: x0 + cb * Nx * delta + sb * Ny * delta, 	y: y0 + sb * Nx * delta          - cb * Ny * delta})	// bottom right	
  
 	var lat_lngs = [LL_TL, LL_TR, LL_BR, LL_BL, LL_TL]
-	G.push(new L.Polyline(lat_lngs, {color: 'yellow',fillOpacity:0,weight: 3}));
+	G.push(new L.Polyline(lat_lngs, {color: 'yellow', fillOpacity:0,weight: 3}));
 
 	LG = L.featureGroup(G).addTo(mymap)	// to draw
 	LH = L.featureGroup(H)			// to download
@@ -634,27 +654,74 @@ function check_last_update()
 {
 	var e        = new Date();
 	var mynewsec = e.getTime()/1000;
+
 	if ((mysec > 0) &  ( (mynewsec - mysec) > 35 ))
 	{
 		$("#myupdateicon").html('<i style="color:yellow" class="blink fa fa-exclamation-triangle"></i>')
+		$("#myupdatetext").html('<span style="color:yellow" class="blink">'+msg.update_error+'</span>' )
 		start_blink()
 		navigator.geolocation.clearWatch(WP)
 		WP = null
+		$('.tofilter').addClass('filter')
 	}
-	if (mysec > 60000)
+}
+
+function get_address(coords)
+{
+	if (coords == null) return false;
+
+	$('#myaddress_0').hide()
+	$('#myaddress_2').show(); 	$('#myaddress_2').text(msg.waiting)
+	$('#myaddress_1').show();	$('#myaddress_1').text('⏳')
+
+	$.get(url_nominatim + '&lon=' + coords.lng + '&lat=' + coords.lat, 
+	function(e)
 	{
-		//$("#myupdatetext").html('Last update: ')
-	}
+		var road = msg.unknown, city = ""
+
+		if (e != null) if (e.address != null)
+		{
+			var f = e.address
+			road = ""
+			if (f.road 		!= null) road += f.road + " "
+			if (f.house_number 	!= null) road += f.house_number 
+
+			if (f.village 		!= null) city = f.village
+			else if (f.twon 	!= null) city = f.town
+			else if (f.suburb 	!= null) city = f.suburb
+
+			$('#myaddress_1').text(msg.close_to)
+			$('#myaddress_2').text(road + ' ' + city + ' ( 🕓 ' +  current_time_hh_mm(new Date()) + ' )')
+
+			address_set    = true
+			address_coords = coords
+			console.log(road, city, e)
+		}
+	 
+	}, 'json')
 }
 
 function get_position()
 {
 	var mytimeout = 60000, g
-	
+	current_coords
 	WP = navigator.geolocation.watchPosition(
 		function(p)
 		{
 			var my_coords  = {lng:p.coords.longitude ,lat: p.coords.latitude}
+			current_coords = my_coords
+
+			if (address_set)
+			{
+				if (mymap.distance(my_coords, address_coords) > 10)
+				{
+					$('#myaddress_0').show()
+					$('#myaddress_1').hide(); 	$('#myaddress_1').text('')
+					$('#myaddress_2').hide();	$('#myaddress_2').text('')		
+					address_set    = false
+					address_coords = null
+				}
+			}
 
 			if (map_state == 1)
 			{
@@ -667,40 +734,53 @@ function get_position()
 			{
 				case 'grid':	g = getSquarePoint(mycrs, my_coords, delta, bea, xlabels, ylabels)
 						$('#mysquare').html(g.mysquare)
-						$('#mylambert72').html(g.mylambert72)
+						//$('#mylambert72').html(g.mylambert72)
 						break;
 			
 				case 'line':	if (the_line != null)
 						{
 							g = getKm(mycrs, my_coords, the_line.XY, the_line.my_s)
 							$('#mysquare').text(g.km)
-							$('#mylambert72').html(g.mylambert72)
+							//$('#mylambert72').html(g.mylambert72)
 						}
 						break;
 			}
 			
-			$('#myaccuracy').html(Math.round(p.coords.accuracy) + " m" )
+			$('#myaccuracy').html('± ' + Math.round(p.coords.accuracy) + " m" )
 			
 			$('#mywgs84').html(Math.round(p.coords.latitude*10000)/10000 + ' ' + Math.round(p.coords.longitude*10000)/10000 )
 			var d = new Date(p.timestamp);
 
 			$("#myupdateicon").html('<i class="fa fa-clock-o"></i>')
-			$("#myupdatetext").html('Last update: ' + d.getDate() + "/" + (d.getMonth() +1) + "/" + d.getFullYear() + " " + (d.getHours() < 10 ? '0' + d.getHours() : d.getHours())  + ":" + (d.getMinutes() < 10 ? '0' + d.getMinutes() : d.getMinutes()) + ":" + (d.getSeconds() < 10 ? '0' + d.getSeconds() : d.getSeconds()))
+			$("#myupdatetext").html(msg.update+' ' + d.getDate() + "/" + (d.getMonth() +1) + "/" + d.getFullYear() + " " +  current_time_hh_mm(d) + ":" + (d.getSeconds() < 10 ? '0' + d.getSeconds() : d.getSeconds()) )
 
 			mysec = p.timestamp/1000
-
+			$('.tofilter').removeClass('filter')
 			check_last_update()
 		}, 
 		function(e)
 		{
 			$("#myupdateicon").html('<i style="color:yellow" class="blink fa fa-exclamation-triangle"></i>')
+			$("#myupdatetext").html('<span style="color:yellow" class="blink">'+msg.gps_error+'</span>' )
 			start_blink()
-			$("#myupdatetext").html('GPS ERROR')
 			navigator.geolocation.clearWatch(WP)
 			WP = null
+			$('.tofilter').addClass('filter')
 		}, 
 		{maximumAge: 0, timeout: mytimeout, enableHighAccuracy: true}
 	)
+}
+
+
+function draw_position()
+{
+if (CM != null) mymap.removeLayer(CM)
+				CM = L.circleMarker( my_coords )
+				CM.addTo(mymap)
+}
+function current_time_hh_mm(d)
+{
+	return (d.getHours() < 10 ? '0' + d.getHours() : d.getHours())  + ":" + (d.getMinutes() < 10 ? '0' + d.getMinutes() : d.getMinutes()) 
 }
 
 function getSquarePoint(thecrs, mycoordinates, delta, bea, caption_x, caption_y)
@@ -720,7 +800,7 @@ function getSquarePoint(thecrs, mycoordinates, delta, bea, caption_x, caption_y)
 		ix 		= Math.floor ( eta_x ), hx = eta_x - ix,
 		mysquare, complem
 
-	console.log(mycoordinates, delta, bea, XY, XY_rotated)
+	//console.log(mycoordinates, delta, bea, XY, XY_rotated)
 
 	if 	((hx < .5)  & (hy < .5) ) complem = 'a'
 	else if ((hx >= .5) & (hy < .5) ) complem = 'b'
@@ -728,12 +808,12 @@ function getSquarePoint(thecrs, mycoordinates, delta, bea, caption_x, caption_y)
 	else if ((hx >= .5) & (hy >= .5)) complem = 'd'
 
 	if ( (ix >=0) & (ix < caption_x.length) & (iy >=0) & (iy < caption_y.length)) 	mysquare = "<div style='margin-top:.5em !important'>" + caption_x[ix].toUpperCase()+caption_y[iy]+complem + "</div>";
-	else										mysquare = "OUT OF<br>AREA"
-		
+	else										mysquare = msg.out_of_br_area
+	
 	var ret =  
 	{	
 		mysquare: 	mysquare,
-		mylambert72:	'x = ' + Math.abs(Math.round(XY.x)) + ', y = ' + Math.abs(Math.round(XY.y))
+		//mylambert72:	'x = ' + Math.abs(Math.round(XY.x)) + ', y = ' + Math.abs(Math.round(XY.y))
 	}
 
 	return ret;
@@ -765,12 +845,12 @@ function getKm(thecrs, mycoordinates, XY, my_s)
 	var k   = indexOfSmallest(my_dist)	// index of the segment for which the distance to the point is the smallest
 
 	var ret = {}
-	ret.mylambert72 = 'x = ' + Math.abs(Math.round(my_XY.x)) + ', y = ' + Math.abs(Math.round(my_XY.y))
+	//ret.mylambert72 = 'x = ' + Math.abs(Math.round(my_XY.x)) + ', y = ' + Math.abs(Math.round(my_XY.y))
 
 	//console.log(k, my_dist[k])
 	if (my_dist[k] > 40000) 	// if distance > 200 m, ie (distance)^2 > 40000 m²
 	{
-		ret.km = 'OUT OF AREA'
+		ret.km = msg.out_of_area
 	}		
 	else
 	{
@@ -789,13 +869,13 @@ function start_blink()
 {
 	blink_watch = setInterval(do_blink, 1000); //Runs every second
 }
-
+/*
 function stop_blink()
 {
 	clearInterval(blink_watch)
 	blink_watch = null
 }
-
+*/
 function indexOfSmallest(a) 
 {
 	//https://blogs.msdn.microsoft.com/oldnewthing/20140526-00/?p=903
@@ -991,6 +1071,7 @@ if (window.File && window.FileReader && window.FileList && window.Blob)
 
 			clear_editable_layers()
 			set_new_editable_layer(layer, 'polyline')
+			mymap.fitBounds(layer.getBounds())
 		}
     
 		//when the file is read it triggers the onload event above.
