@@ -1,14 +1,17 @@
 $(window).load(onDeviceReady)
 
-var debug 	= true
+var debug 	  = false
 var url_base      = 'https://grid.my-poppy.eu/' 		// trailing / is important so that some QR code readers are able to read the url
 var url_stats     = 'https://grid.my-poppy.eu/stats.php'
 var url_nominatim = "https://nominatim.openstreetmap.org/reverse?format=json"
-var x0y0      = [152200, 153000]; // in EPSG31370
 var delta     = 100; // in meters
 var bea       = 0;   // in degrees
+var invxy     = 0,   // 1 if inverse x & y
+    revy      = 0    // 1 if reverse y (bottom to top instead of top to bottom)
 var xlabels   = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j','k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v','w', 'x', 'y', 'z'];
 var ylabels   = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40'];
+var Nx0       = xlabels.length, 
+    Ny0       = ylabels.length
 var mycrs     = null
 var mysec     = 0;
 var WP        = null;
@@ -32,13 +35,14 @@ var current_coords = null
 var address_set    = false
 
 var tms  = [
-                { url:'',   attr: 'Skobbler', subd:['1', '2', '3'], maxzoom:18 },
-                { url:'',                                                      attr: 'Mapbox',   subd:['a', 'b', 'c'], maxzoom:20 },
-                { url:'',                                                      attr: 'Mapbox',   subd:['a', 'b', 'c'], maxzoom:20 }
+                { url:'',   attr: 'Skobbler', subd:['1', '2', '3'], maxZoom:24, maxNativeZoom:18 },
+                { url:'',                                                      attr: 'Mapbox',   subd:['a', 'b', 'c'], maxZoom:24, maxNativeZoom:24 },
+                { url:'',                                                      attr: 'Mapbox',   subd:['a', 'b', 'c'], maxZoom:24, maxNativeZoom:24 }
            ]
 
 var TL        = null
-var epsg_31370_str = '+lat_0=90 +lat_1=51.16666723333333 +lat_2=49.8333339 '
+
+var epsg_31370_str      = '+lat_0=90 +lat_1=51.16666723333333 +lat_2=49.8333339 '
 		         +'+lon_0=4.367486666666666 '
        			 +'+x_0=150000.013 +y_0=5400088.438 '
 	       		 +'+ellps=intl '
@@ -46,8 +50,10 @@ var epsg_31370_str = '+lat_0=90 +lat_1=51.16666723333333 +lat_2=49.8333339 '
 			 +'+towgs84=-106.869,52.2978,-103.724,0.3366,-0.457,1.8422,-1.2747 '
 	       		 +'+units=m '
 	       		 +'+no_defs'
-var editableLayers
-var lineLayers
+
+var editableLayers 	= null
+var lineLayers		= null
+
 var blink_watch = null
 var TYPEREF     = 'master'
 
@@ -136,10 +142,17 @@ function init()
 
 		init_map()
 
+		$('#map2').height($(window).height()).css('position', 'fixed').css('top', '0').css('left', '0').css('right', '0').css('bottom', '0')
+
 		$('#myaddress').click(function(){get_address(current_coords)})
 
 		var s = window.location.href.split(sep_url)
 		s = s[1]
+
+		if ( (s.indexOf(',') == -1) &  (s.indexOf(',') == -1) ) 
+		{
+			s = decodeURIComponent(s)
+		}
 
 		if (s.indexOf('lineblob') > -1)		// LINE
 		{
@@ -164,37 +177,63 @@ function init()
 		}
 		else					// GRID
 		{
-			TYPEREF = 'grid'
-
-			s       = s.split(',')
-			x0y0    = [s[0], s[1]]
-			delta   = s[2]
-			bea     = s[3]
-
-			var LAT0 = 0,              LNG0 = 0
-			var Nx0  = xlabels.length, Ny0  = xlabels.length
+			var go   = false
 
 			if (s.length > 4)
 			{
-				LAT0 = s[4]
-				LNG0 = s[5]
-	 	
-				mycrs = new L.Proj.CRS("EPSG:999999","+proj=tmerc +lat_0="+LAT0+" +lon_0="+LNG0+" +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+				go 	 = true
+				TYPEREF  = 'grid'
 
+				s        = s.split(',')
+				delta    = s[2]
+				bea      = s[3]
+			
+				var x0y0
+				Nx0  = xlabels.length, 
+				Ny0  = xlabels.length
+
+				var LAT0 = s[4]
+				var LNG0 = s[5]
+
+				if (s[0] == 0)		// metric CRS, square anywhere on the world, dimensions not accurate 
+				{
+					mycrs = new L.Proj.CRS("EPSG:999999","+proj=tmerc +lat_0="+LAT0+" +lon_0="+LNG0+" +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+					x0y0  = {x:0, y:0}
+				}
+				else if (s[0] == '31370')		// epsg 31370 -> lambert 72 -> works in Belgium only, perfectly metric
+				{
+					mycrs = new L.Proj.CRS('EPSG:31370', epsg_31370_str, { resolutions: [8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1] })
+					x0y0  = mycrs.projection.project({lat:LAT0, lng:LNG0})	 
+				}
+				else
+				{
+					go = false
+				}
+	 	
 				if (s.length > 6)
 				{
-					Nx0 = s[6]
-					Ny0 = s[7]
+					Nx0 = s[6]			// number of squares in x
+					Ny0 = s[7]			// number of squares in y
+
+					if (s.length > 8)
+					{
+						invxy = s[8]		// inverse xy ?	  (figures in x, letters in y) 			-- 0 = false, 1 = true
+						revy  = s[9]		// reverse in y ? (bottom to top instead of top to bottom) 	-- 0 = false, 1 = true
+					}
+				}
+
+				if (go) 
+				{
+					show_grid(x0y0, xlabels, ylabels, delta, Nx0, Ny0, bea, invxy, revy)
 				}
 			}
-			else
+
+			if (!go)
 			{
-				mycrs = new L.Proj.CRS('EPSG:31370', epsg_31370_str, { resolutions: [8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1] })
-				$('#coord_caption').text('Lambert 72')
-				Nx0 = xlabels.length
-				Ny0 = ylabels.length
+				window.alert(msg.error_url)
+				return false
 			}
-			show_grid({x:x0y0[0],y:x0y0[1]}, xlabels, ylabels, delta, Nx0, Ny0, bea)
+			
 		}
 
 		$("#myupdateicon").html('<i class="fa fa-spinner fa-spin"></i>')
@@ -286,14 +325,14 @@ function create_line(e)
 	else
 	{
 		window.alert(msg.line_explain); 
-		new L.Draw.Polyline(mymap, {shapeOptions:  {color: '#f357a1',weight: 5}}).enable() 			
+		new L.Draw.Polyline(mymap, {shapeOptions:  {color: '#f357a1',weight: 5 }}).enable() 			
 	}
 }
 
 
 function create_grid(e)
 {
-	if (mobileAndTabletcheck() )
+	if (mobileAndTabletcheck())
 	{
 		window.alert(msg.grid_explain)
 		mymap.on('dblclick', function(e)
@@ -303,7 +342,7 @@ function create_grid(e)
 			var X0Y0     	= mycrs.projection.project(e.latlng)
 		 
 			bea   		= mymap.getBearing()
-			show_grid(X0Y0, xlabels, ylabels, delta, xlabels.length, ylabels.length, bea)
+			show_grid(X0Y0, xlabels, ylabels, delta, xlabels.length, ylabels.length, bea, invxy, revy)
 			myurl 		= url_base + sep_url + Math.round(X0Y0.x) + ',' + Math.round(X0Y0.y) + ',' + delta + ',' + bea + ',' + e.latlng.lat + ',' + e.latlng.lng +',' + xlabels.length  +',' + ylabels.length
 		
 			mymap.off('dblclick')
@@ -319,7 +358,6 @@ function create_grid(e)
 		var rect  = new L.Draw.Rectangle(mymap, {shapeOptions: {color: '#FFF'}})
 		rect.enable();
 	}
-
 }
 	
 function toggle_map()
@@ -360,37 +398,79 @@ function init_map()
 
 	mymap = L.map('map2', 
 	{
+		zoomControl: false,
 		zoomDelta:	.25, 
 		zoomSnap:	.25, 
 		rotate:		true, 
-		photonControl: 	true,
-		photonControlOptions: 
-		{
-			placeholder: msg.adress,
-			position: 'topleft',
-			onSelected: myPhotonHandler,
-		}
+		
 	}).setView([50, 4], 13);
 
-	mymap.locate({setView : true});
+	mymap.locate({setView : true, maxZoom:17});
 	L.control.scale().addTo(mymap);
+
+	L.easyButton('fa-chevron-left',  toggle_map, 'back', 'topleft').addTo( mymap );  
+	L.control.photon( 
+		{
+			placeholder: 	msg.adress,
+			position: 	'topleft',
+			onSelected: 	myPhotonHandler,
+		}).addTo(mymap);
  
 	TLayer_set()
 
-	L.easyButton('fa-step-backward btn-back',  toggle_map, 'back', 'topright').addTo( mymap );  
+	L.control.zoom({position:'bottomright'}).addTo(mymap);
 
 	L.easyButton('fa-rotate-left',     function(btn, map){ mymap.setBearing(mymap.getBearing()-2) }, 'rotate map', 'topright').addTo( mymap );  
 	L.easyButton('fa-rotate-right',    function(btn, map){ mymap.setBearing(mymap.getBearing()+2) }, 'rotate map', 'topright').addTo( mymap );  
 
-	L.easyButton('fa-map',      function(btn, map)
-	{
-		++current_url
-		current_url = current_url%tms.length
+	var animatedToggle = L.easyButton( 
+	{	
+	    states: [	{
+        		    	stateName: 'to-terrain',        
+				icon:      '<img height="22" src="img/mountain.svg">',                
+				title:     'change basemap to terrain',       
+				onClick: function(btn, map) 
+				{     
+	        	        	++current_url
+					current_url = current_url%tms.length
+				
+					mymap.removeLayer(TL)
+					TLayer_set()
+        	        		btn.state('to-roads-1');     
+	            		}
+        		}, 
+			{
+        		    	stateName: 'to-roads-1',        
+				icon:      'fa-road',               
+				title:     'change basemap to roads',      
+				onClick: function(btn, map) 
+				{       
+	        	        	++current_url
+					current_url = current_url%tms.length
+				
+					mymap.removeLayer(TL)
+					TLayer_set()
+        	        		btn.state('to-roads-2');    
+	            		}
+        		}, 
+			{
+        		    	stateName: 'to-roads-2',        
+				icon:      'fa-road',                
+				title:     'change basemap to roads',      
+				onClick: function(btn, map) 
+				{        
+	        	        	++current_url
+					current_url = current_url%tms.length
+				
+					mymap.removeLayer(TL)
+					TLayer_set()
+        	        		btn.state('to-terrain');    
+	            		}
+        		}, 
 		
-		mymap.removeLayer(TL)
-		TLayer_set()
-		
-	}, 'change basemap', 'topright').addTo( mymap );  
+    	]
+	}) // , 'topright'
+	animatedToggle.addTo( mymap );  
 
 	L.easyButton('fa-info-circle', function(btn, map)
 	{
@@ -409,19 +489,46 @@ function init_map()
 				+"leaflet-easyPrint [github.com/rowanwins/leaflet-easyPrint/blob/gh-pages/LICENSE]\n"
 				+"tokml.js [github.com/mapbox/tokml]\n"
 				+"download2.js [danml.com/download.html]\n"
+				+'Mountain icon made by www.freepik.com from flaticon.com is licensed by CC 3.0 BY (creativecommons.org/licenses/by/3.0)'
 		)
 	}, 'credits', 'bottomleft').addTo( mymap );  
 
 	L.easyPrint({
 		title: 'Print',
-		position: 'bottomright',
+		position: 'bottomleft',
 		sizeModes: ['Current'],
 	}).addTo(mymap);
  
 	// set up editable layers
+
 	editableLayers  = L.featureGroup().addTo(mymap)
 	lineLayers      = L.featureGroup().addTo(mymap)
 	LH 		= L.featureGroup()
+
+	// OR : <<< https://github.com/Leaflet/Leaflet.Editable <<<
+	/*
+		var drawControl = new L.Control.Draw({
+		draw:	false,
+		edit: 	
+		{
+			featureGroup: 	editableLayers,
+			remove: 	false 
+		},
+     		});
+		mymap.addControl(drawControl);
+
+		// 1. editable layers should be also for the rectangle
+		// 2. should show the control unthe one of the '1' buttons, in the needed context		
+		// no display of the control for visu only
+	*/
+	// document.querySelector(".leaflet-draw-edit-edit").click();
+	// same events on modified than for on draw:
+	/*	mymap.on(L.Draw.Event.EDITED, function (e) 
+	{
+		// e is now an array !
+		console.log(e)
+		set_new_editable_layer(e.layer, e.layerType)
+    	});*/
 
 	mymap.on(L.Draw.Event.DRAWSTART, clear_editable_layers)
 
@@ -561,7 +668,7 @@ function set_new_editable_layer(layer, type)
 			if (delta != null)
 			{
 				bea   		= mymap.getBearing()
-				show_grid({x:0, y:0}, xlabels, ylabels, delta, Nx, Ny, bea)
+				show_grid({x:0, y:0}, xlabels, ylabels, delta, Nx, Ny, bea, invxy, revy)
 				myurl 		= url_base + sep_url + '0,0,' + delta + ',' + bea + ',' + LL[mod(j,4)].lat + ',' + LL[mod(j,4)].lng + ',' + Nx + ',' + Ny
 			}
 		 
@@ -575,13 +682,14 @@ function TLayer_set()
 {
 	TL = L.tileLayer(tms[current_url].url, 
 		{
-		attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors + '+tms[current_url].attr+', <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>', 
-		subdomains:  tms[current_url].subd,
-		maxZoom:     tms[current_url].maxzoom,
+		attribution: 		'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors + '+tms[current_url].attr+', <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>', 
+		subdomains:  		tms[current_url].subd,
+		maxZoom:     		tms[current_url].maxZoom,
+		maxNativeZoom:     	tms[current_url].maxNativeZoom,
 		opacity:     0.5,
 	}).addTo(mymap);
 }
-function show_grid(latlng_31370, xlabels, ylabels, delta, Nx, Ny, b)
+function show_grid(latlng_31370, xlabels, ylabels, delta, Nx, Ny, b, invxy, revy)
 {
 	// lowlevel grid
 	var 	G = [], H = [],
@@ -589,7 +697,7 @@ function show_grid(latlng_31370, xlabels, ylabels, delta, Nx, Ny, b)
 		sb = Math.sin(b*Math.PI/180),
 		x0 = parseFloat(latlng_31370.x),	// ! parseFloat ! otherwise string concat !!
 		y0 = parseFloat(latlng_31370.y)
- 
+
 	for(var i=0; i<Nx; ++i) 
 	{
 		for(var j=0; j<Ny; ++j)
@@ -603,23 +711,34 @@ function show_grid(latlng_31370, xlabels, ylabels, delta, Nx, Ny, b)
 			var LL_BR = mycrs.projection.unproject({x: x0 + cb*(i+1)*delta + sb*(j+1) * delta, y: y0 + sb*(i+1)*delta - cb*(j+1) * delta})	// bottom right	
  
 			var lat_lngs = [LL_TL, LL_TR, LL_BR, LL_BL, LL_TL]
+
 			var myname = ''
+
+			var newj   = j
+			if (revy == 1) newj = Ny - 1  - j
+		 
+			if (invxy == 1)
+			{
+				myname = xlabels[newj].toUpperCase() + ylabels[i]
+			}
+			else
+			{
+				myname = xlabels[i].toUpperCase()+ylabels[newj];
+			}
 
 			if ( ( (i%2==0) & (j%2==0) ) ) 
 			{
-				myname     		= xlabels[i].toUpperCase()+ylabels[j]
 				var myIcon 		= L.divIcon({className:'emptyicon', html: myname});
 				var marker 		= L.marker(LL, {icon: myIcon})
 				marker.properties 	= {};
-				marker.properties.Name 	= "Test"
+				//marker.properties.Name 	= "Test"
 				G.push(marker)
 				H.push(L.marker(LL, {icon: myIcon, name: myname }));			// to display the names
 			}
 			
 			if ( (i == 0) | (j == 0 ) )
 			{
-				myname     = xlabels[i].toUpperCase()+ylabels[j]
-				var myIcon = L.divIcon({className:'boldicon', html: myname});
+				var myIcon 		= L.divIcon({className:'boldicon', html: myname});
 				G.push(L.marker(LL, {icon: myIcon}))
 				H.push(L.marker(LL, {icon: myIcon, name: myname }));			// to display the names
 			}
@@ -807,7 +926,19 @@ function getSquarePoint(thecrs, mycoordinates, delta, bea, caption_x, caption_y)
 	else if ((hx < .5)  & (hy >= .5)) complem = 'c'
 	else if ((hx >= .5) & (hy >= .5)) complem = 'd'
 
-	if ( (ix >=0) & (ix < caption_x.length) & (iy >=0) & (iy < caption_y.length)) 	mysquare = "<div style='margin-top:.5em !important'>" + caption_x[ix].toUpperCase()+caption_y[iy]+complem + "</div>";
+	var newy   = iy, myname = ''
+	if (revy == 1) newy = Ny0 - 1  - iy
+		 
+	if (invxy == 1)
+	{
+		myname = xlabels[newy].toUpperCase() + ylabels[ix]
+	}
+	else
+	{
+		myname = xlabels[ix].toUpperCase()+ylabels[newy];
+	}
+
+	if ( (ix >= 0) & (ix < caption_x.length) & (iy >=0) & (iy < caption_y.length)) 	mysquare = "<div style='margin-top:.5em !important'>" + myname+complem + "</div>";
 	else										mysquare = msg.out_of_br_area
 	
 	var ret =  
