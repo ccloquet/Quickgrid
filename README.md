@@ -3,8 +3,8 @@ When using a gridded printed map on the field, this quick app tells you the grid
 
 Demo :
   - build grid or parcours : https://grid.my-poppy.eu 
-  - display & locate on grid : https://grid.my-poppy.eu?0,0,100,45,50,4
-  - display & locate on parcours : https://grid.my-poppy.eu?lineblob=6b1041ce-68ca-11e8-94d5-3b046b2be916
+  - display & locate on grid : https://grid.my-poppy.eu/?0,0,100,45,50,4
+  - display & locate on parcours : https://grid.my-poppy.eu/?lineblob=6b1041ce-68ca-11e8-94d5-3b046b2be916
 
 
 ![Screenshot](screenshot.png?raw=true "Screenshot") 
@@ -17,23 +17,30 @@ where
 Usage : 
   - to create the grid / parcours : 
        - go to [url]
-       - use 'Grille : créer', 'Parcours : créer' ou 'Parcours : KML/GPX'
+       - use 'Créer grille : créer', 'Créer parcours' ou 'Importer parcours'
        - draw the grid or the parcours
        - click on 'Partager' to show the url & QR-code
    
   - to know your current location :
        - enable geolocation
-       - open the url, eg. [url]?x0,y0,bearing,delta,X0,Y0,Nx,Ny
+       - open the url, eg. [url]?SCR,0,bearing,delta,X0,Y0,Nx,Ny,inv_xy,rev_y
 
 Where
-  - x0 is the West coordinate in local TMercator (ie, most of the time, 0)
-  - y0 is the North Coordinate in local TMercator (ie, most of the time, 0)
+  - SCR is the reference coordinate system (available options : 31370 : Lambert 72), or 0 for local TMercator
+  - 0 is currently not used
   - delta is the grid square length in meters
   - bearing is the map azimuth in degrees
   - X0,Y0 are the WGS84 coordinates of the origin of the local TMercator coordinates system
   - Nx is the number of squares in X direction (horizontal)
   - Ny is the number of squares in Y direction (vertical)
+  - inv_xy : if 0, use letters in x and figures in y. if 1, use figures in x and letters in y
+  - rev_y : if 0, y coordinates is from top to bottom, if 0 from bottom to top
   
+The graphical user interface only allow to produces a grid in TMercator, with letters in x and figures in y (from top to bottom). But you may tweak the link afterwards.
+
+Full example : 
+https://grid.my-poppy.eu/?31370,0,100,0,50.45019,5.95576,18,27,0,0
+ 
 To use it operationnally
 
   - the x0, y0,delta,bearing should correspond to your printed map
