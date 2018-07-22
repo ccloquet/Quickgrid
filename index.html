@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <!--html manifest="application.appcache"-->
 <html>
 
@@ -12,7 +12,22 @@
 
 
 <style>
-body		{overflow-x:hidden;overflow-y:hidden;font-family:Lucida Sans, "Arial", Helvetica, sans-serif; background:rgb(16,46,66); color:white; padding:0% 2.5%}
+ 
+
+body		
+{
+		overflow-x:hidden;overflow-y:hidden;font-family:"Lucida Sans Unicode", "Lucida Grande", "Arial", Helvetica, sans-serif; background-color:rgb(16,46,66); color:white; padding:0% 2.5%; height:100%;
+		background-size: 60px 60px;
+		background-image: linear-gradient(to right, rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.05) 1px, transparent 1px)
+}
+ 
+.follow-me {
+  position:absolute;
+  bottom:10px;
+  right:10px;
+  text-decoration: none;
+  color: #FFFFFF;
+}
 
 .divicon
 {
@@ -30,16 +45,7 @@ body		{overflow-x:hidden;overflow-y:hidden;font-family:Lucida Sans, "Arial", Hel
 {
 	text-align:center;
 	height:15%;
-	padding: 1em;
-}
-.coord_caption
-{
-	height:10%;
-	padding-top:    .25em;
-	padding-bottom: .25em;
-	text-align: left;
-	/*font-weight: bold;*/
-	color:lightgray;
+	padding: 1em 0em;
 }
 .emptyicon
 {
@@ -116,7 +122,11 @@ ul.photon-autocomplete
 	-webkit-filter: 	blur(7px);
 	-o-filter: 		blur(7px);
 }
-
+.inaccurate
+{
+	color:		#ffad00;
+	font-weight:	bold;
+}
 </style>
 
     <head>
@@ -124,7 +134,7 @@ ul.photon-autocomplete
         <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height, target-densitydpi=device-dpi" />
     </head>
     <body>
-	<div class="togglemap fa fa-globe fa-2x"     style="position:fixed; top:5px; right:5px"></div>
+	<div class="togglemap hide_for_wear fa fa-chevron-right fa-2x"     style="position:fixed; color:red; top:20px; right:10px;color:rgba(255, 173, 0, .5)"></div>
 	
 	<div id="app2" class="app" style="display:none">
 		<div id="maptools">
@@ -141,34 +151,33 @@ ul.photon-autocomplete
 		<div id="map2"></div>
 	</div>
         <div id="app" class="app" style="display:none">
-			<div style="font-size:200%; text-align:center;margin-top:15px">Poppy Quickgrid</div>
-			<div style="font-size:70%; text-align:center;margin-top:15px; letter-spacing:3px" id="div-demo">Demo version</div>
-
+			<div class='hide_for_wear' style="font-size:200%; text-align:center;margin-top:15px; font-weight:lighter">Poppy Quickgrid</div>
+			<div class='hide_for_wear' style="font-size:70%; text-align:center;margin-top:15px; letter-spacing:3px" id="div-demo">Demo version</div>
 
 			<div id="mysquare"      class="coord tofilter filter" style="font-family:Lucida Sans;font-size:300%; font-weight:bold;height:2em;color:#ffad00">OUT OF<br>AREA</div>
-			<div id="div-accuracy"  class="coord_caption">We found you with an accuracy of</div>
-			<div id="myaccuracy"    class="coord tofilter filter" style="height:1em">[ trying to retrieve your location ]</div>
-				
-			<!--div class="coord_caption">XY</div>
-			<div id="mylambert72"  class="coord" style="height:1em">[ trying to retrieve your location ]</div-->
-				
-			<div id="div-latlon" 	class="coord_caption">Latitude/longitude</div>
-			<div id="mywgs84"     	class="coord tofilter filter" style="height:1em;">[ trying to retrieve your location ]</div>
-
-			<div id="myaddress"  style="border-radius:7px; border:1px dotted white; margin-top:1em">
-				<div id="myaddress_0"  	class="coord tofilter filter" style="height:1em; padding:1.5em">Tap to retrieve address</div>
-				<div id="myaddress_1"  	class="coord tofilter filter" style="height:1em; padding:.5em; display:none"></div>
-				<div id="myaddress_2"  	class="coord tofilter filter" style="height:1em; padding:.5em; display:none"></div>
+		
+			<div style='text-align:center' class='tofilter filter'>
+			<i style='color:lightgray' class='fa fa-map-marker'></i>&nbsp;&nbsp;<span id="mywgs84"     	class="coord" style="height:1em;">[ trying to retrieve your location ]</span>
 			</div>
-			<br><br>&nbsp;
+			<br>
+			<div style='text-align:center' class='tofilter filter'>
+			<span style='color:lightgray'>🎯 </span>&nbsp;<span id="myaccuracy"    class="coord" style="height:1em">[ trying to retrieve your location ]</span>
+			</div>
+			<br>
+
+			<div id="myaddress"  class="hide_for_wear" style="border-radius:7px; border:1px dotted white; background:rgb(16,46,66); position:fixed; bottom:5.5em; left:1em; right:1em" >
+				<div id="myaddress_0"  	class="coord tofilter filter" style="height:1em; padding:1.5em">Tap to retrieve address</div>
+				<div id="myaddress_1"  	class="coord tofilter filter" style="height:1em; padding:.5em; display:none; font-size:90%;color:lightgray;"></div>
+				<div id="myaddress_2"  	class="coord tofilter filter" style="height:1em; padding:.5em; display:none; white-space: nowrap; overflow: hidden;    text-overflow: ellipsis;"></div>
+			</div>
 			
-			<div id="mylastupdate" style="position:fixed; z-index: 1; bottom:1%; background:rgb(16,46,66); "><span id="myupdateicon"></span>&nbsp;<span id="myupdatetext"></span></div>
+			<div id="mylastupdate" style="position:fixed; z-index: 1; bottom:10px; background:rgb(16,46,66); "><span id="myupdateicon"></span>&nbsp;<span id="myupdatetext"></span></div>
         </div>
 
 	<div id="qrcode-wrap" style="position: absolute;top: 0px;left: 0px;height:380px;max-height:100%;width:275px;max-width:100%;z-index: 9999999; border-radius:10px;background:white;color:black;padding:25px; text-align:center; display:none">
 		<div      id="qrcode-use-link" 	style='margin-bottom:.5em'>Utilisez ce lien sur smartphone pour connaître votre position</div><br>
 		<textarea id="qrcode-text"  	style="font-family:inherit;padding:5px;background:lightgray;width:80%;height:4em"></textarea>
-		<div   	  id="qrcode"       	style="background:white;margin:20px 50px" >
+		<div   	  id="qrcode"       	style="background:white;margin:20px 50px">
 		</div>
 		<div   	  id="qrcode-close" 	style="padding-top:.5em">OK</div>
 	</div>
@@ -184,8 +193,9 @@ ul.photon-autocomplete
 	<script type="text/javascript" src="js/leaflet-omnivore-0.3.3/leaflet-omnivore.min.js"></script>
 	<script type="text/javascript" src="js/davidshimjs-qrcodejs-04f46c6/qrcode.min.js"></script>
 	<script type="text/javascript" src="js/leaflet-easyPrint-v1-2018-06-18/dist/bundle.js"></script>
-	<script type="text/javascript" src="js/trads.js?a=70"></script>
-	<script type="text/javascript" src="js/index.js?a=70"></script>
+	<script type="text/javascript" src="js/Leaflet.Editable-1.1.0/src/Leaflet.Editable.js"></script>
+	<script type="text/javascript" src="js/trads.js?a=90"></script>
+	<script type="text/javascript" src="js/index.js?a=90"></script>
 	<script type="text/javascript" src="js/tokml.js"></script>
 	<script type="text/javascript" src="js/download2.js"></script>
 	
