@@ -4,6 +4,7 @@ When using a gridded printed map on the field, this quick app tells you the grid
 Demo :
   - build grid or parcours : https://grid.my-poppy.eu 
   - display & locate on grid : https://grid.my-poppy.eu/?0,0,100,45,50,4
+  - display & locate on grid (new url format) : https://grid.my-poppy.eu/?scr=0,delta=100,bea=45,LAT0=50,LNG0=4&Nx=10&Ny=15&invxy=1&revy=0&bm=mapnik
   - display & locate on parcours : https://grid.my-poppy.eu/?lineblob=6b1041ce-68ca-11e8-94d5-3b046b2be916
 
 
@@ -23,18 +24,19 @@ Usage :
    
   - to know your current location :
        - enable geolocation
-       - open the url, eg. [url]?SCR,0,bearing,delta,X0,Y0,Nx,Ny,inv_xy,rev_y
+       - open the url, eg. [url]?scr,0,bea,delta,LAT0,LNG0,Nx,Ny,invxy,revy
 
 Where
-  - SCR is the reference coordinate system (available options : 31370 : Lambert 72), or 0 for local TMercator
+  - scr is the reference coordinate system (available options : 31370 : Lambert 72), or 0 for local TMercator
   - 0 is currently not used
   - delta is the grid square length in meters
-  - bearing is the map azimuth in degrees
-  - X0,Y0 are the WGS84 coordinates of the origin of the local TMercator coordinates system
+  - bea is the map azimuth in degrees
+  - LAT0,LNG0 are the WGS84 coordinates of the origin of the local TMercator coordinates system
   - Nx is the number of squares in X direction (horizontal)
   - Ny is the number of squares in Y direction (vertical)
-  - inv_xy : if 0, use letters in x and figures in y. if 1, use figures in x and letters in y
-  - rev_y : if 0, y coordinates is from top to bottom, if 0 from bottom to top
+  - invxy : if 0, use letters in x and figures in y. if 1, use figures in x and letters in y
+  - revy : if 0, y coordinates is from top to bottom, if 0 from bottom to top
+  - bm : the basemap to use (among the available basemaps)
   
 The graphical user interface only allow to produces a grid in TMercator, with letters in x and figures in y (from top to bottom). But you may tweak the link afterwards.
 
