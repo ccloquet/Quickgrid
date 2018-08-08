@@ -9,11 +9,8 @@
 <link rel="stylesheet" href="js/Leaflet.draw-0.4.14/dist/leaflet.draw.css">
 <link rel="stylesheet" href="js/leaflet.photon-0.7.3/leaflet.photon.css">
 
-
-
 <style>
  
-
 body		
 {
 		overflow-x:hidden;overflow-y:hidden;font-family:"Lucida Sans Unicode", "Lucida Grande", "Arial", Helvetica, sans-serif; background-color:rgb(16,46,66); color:white; padding:0% 2.5%; height:100%;
@@ -177,12 +174,14 @@ ul.photon-autocomplete
 	<div id="qrcode-wrap" style="position: absolute;top: 0px;left: 0px;height:380px;max-height:100%;width:275px;max-width:100%;z-index: 9999999; border-radius:10px;background:white;color:black;padding:25px; text-align:center; display:none">
 		<div      id="qrcode-use-link" 	style='margin-bottom:.5em'>Utilisez ce lien sur smartphone pour connaître votre position</div><br>
 		<textarea id="qrcode-text"  	style="font-family:inherit;padding:5px;background:lightgray;width:80%;height:4em"></textarea>
+
+		<div   	  id="qrcode_wait"     	style="background:white;margin:20px 50px; display:hidden"><i class="fa fa-spin fa-spinner fa-4x"></i></div>
 		<div   	  id="qrcode"       	style="background:white;margin:20px 50px">
 		</div>
 		<div   	  id="qrcode-close" 	style="padding-top:.5em">OK</div>
 	</div>
 
-	<script src="js/leaflet-1.3.1-fork-va2ron1-20180406/leaflet.js?a=1"></script> 
+	<script src="js/leaflet-1.3.1-fork-va2ron1-20180406/leaflet-src.js?a=1"></script> 
 	<script type="text/javascript" src="js/hammer-2.0.8.js"></script>
 	<script src="js/Proj4Leaflet-0.7.0/lib/proj4-compressed.js"></script>
 	<script src="js/Proj4Leaflet-0.7.0/src/proj4leaflet.js"></script>
@@ -193,13 +192,14 @@ ul.photon-autocomplete
 	<script type="text/javascript" src="js/leaflet-omnivore-0.3.3/leaflet-omnivore.min.js"></script>
 	<script type="text/javascript" src="js/davidshimjs-qrcodejs-04f46c6/qrcode.min.js"></script>
 	<script type="text/javascript" src="js/leaflet-easyPrint-v1-2018-06-18/dist/bundle.js"></script>
-	<script type="text/javascript" src="js/Leaflet.Editable-1.1.0/src/Leaflet.Editable.js"></script>
+	<!--script type="text/javascript" src="js/Leaflet.Editable-1.1.0/src/Leaflet.Editable.js"></script-->
+	<!--script type="text/javascript" src="js/Leaflet.Path.Transform-1.1.1/dist/L.Path.Transform.js"></script-->
 	<script type="text/javascript" src="js/trads.js?a=90"></script>
-	<script type="text/javascript" src="js/index.js?a=90"></script>
+	<script type="text/javascript" src="js/basemaps.js?a=93"></script>
+	<script type="text/javascript" src="js/index.js?a=93"></script>
 	<script type="text/javascript" src="js/tokml.js"></script>
 	<script type="text/javascript" src="js/download2.js"></script>
 	
-
     </body>
 </html>
 
